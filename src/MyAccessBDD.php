@@ -32,6 +32,14 @@ class MyAccessBDD extends AccessBDD {
      */	
     protected function traitementSelect(string $table, ?array $champs) : ?array{
         switch($table){  
+            case "detailcommande" :
+                return $this->selectDetailCommande($champs);
+            case "commandedocument" :
+                return $this->selectAllCommandedocuments();
+            case "suivi":
+                return $this->selectAllSuivi();
+            case "commande": 
+                return $this->selectAllCommandes();
             case "livre" :
                 return $this->selectAllLivres();
             case "dvd" :
@@ -48,6 +56,8 @@ class MyAccessBDD extends AccessBDD {
                 return $this->selectTableSimple($table);
             case "exemplaire" :
                 return $this->selectExemplairesRevue($champs['id']);
+            case "detailcommande" :
+                return $this->selectDetailCommande($champs['idLivreDvd']);
             case "" :
                 // return $this->uneFonction(parametres);
             default:
@@ -64,7 +74,9 @@ class MyAccessBDD extends AccessBDD {
      * @override
      */	
     protected function traitementInsert(string $table, ?array $champs) : ?int{
-        switch($table){
+        switch($table){ 
+            case "detailcommande":
+                return $this->insertDetailCommande($champs);
             case "" :
                 // return $this->uneFonction(parametres);
             default:                    
@@ -277,6 +289,108 @@ class MyAccessBDD extends AccessBDD {
         $requete .= "where e.id = :id ";
         $requete .= "order by e.dateAchat DESC";		
         return $this->conn->queryBDD($requete, $champNecessaire);
-    }		    
+    }	
+    
+    /**
+    * Récupère toutes les commandes de livres
+    * @return array|null
+    */
+    private function selectAllCommandes() : ?array {
+        $requete = " select c.id, c.dateCommande, c.montant ";
+        $requete .= "from commande c ";
+        $requete .= "order by c.dateCommande desc";
+    return $this->conn->queryBDD($requete);
+    }
+    
+    private function selectAllCommandedocuments() : ?array {
+        $requete = "select cd.id, cd.nbExemplaire, cd.idLivreDvd ";
+        $requete .= "from commandedocument as cd ";
+        $requete .= "join commande AS c ON cd.id = c.id ";
+        $requete .= "order by cd.id desc ";
+        
+        var_dump($requete);
+        return $this->conn->queryBDD($requete);
+    }
+    
+   private function selectAllSuivi() : ?array {
+    $requete = "SELECT s.id, s.idCommandeDocument, s.etape ";
+    $requete .= "FROM suivi as s ";
+    $requete .= "join commandedocument as cd on s.idCommandeDocument = cd.id ";
+    $requete .= "ORDER BY s.id DESC ";
+    return $this->conn->queryBDD($requete);
+    }
+
+    
+    private function selectDetailCommande (?array $champs) : ?array{  
+        if(empty($champs)){
+            return null;
+        }
+        if(!array_key_exists('idLivreDvd', $champs)){
+            return null;
+        }
+        $champsNecessaire['idLivreDvd'] = $champs['idLivreDvd'];
+        $requete = "SELECT c.id AS idCommande, cd.id AS idCommandeDocument, c.dateCommande AS dateCommande, c.montant as montant, cd.nbExemplaire as nbExemplaire, cd.idLivreDvd as idLivreDvd, s.etape AS etape ";
+        $requete .= "from commandedocument cd ";
+        $requete .= "join commande c on cd.id = c.id ";
+        $requete .= "left join suivi s on cd.id = s.idCommandeDocument ";
+        $requete .= "where cd.idLivreDvd = :idLivreDvd ";
+        $requete .= "order by c.dateCommande desc ";
+        
+        return $this->conn->queryBDD($requete, $champsNecessaire);
+    }
+    
+    public function insertDetailCommande(?bool $champs): ?bool {
+    
+    $champs = json_decode(file_get_contents("php://input"), true);
+    if ($champs === null || 
+        !isset($champs['IdCommande']) || 
+        !isset($champs['IdCommandeDocument']) || 
+        !isset($champs['DateCommande']) || 
+        !isset($champs['Montant']) || 
+        !isset($champs['NbExemplaire']) || 
+        !isset($champs['IdLivreDvd']) || 
+        !isset($champs['Etape'])) {
+
+       
+        return false;
+    }
+
+    $requeteCommande = "INSERT INTO commande (id, dateCommande, montant) VALUES (:id, :dateCommande, :montant)";
+    $paramsCommande = [
+        'id' => $champs['IdCommande'],  
+        'dateCommande' => $champs['DateCommande'],
+        'montant' => $champs['Montant']
+    ];
+    $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
+   
+
+    
+    $requeteCommandeDocument = "INSERT INTO commandedocument (id, nbExemplaire, idLivreDvd) VALUES (:id, :nbExemplaire, :idLivreDvd)";
+    $paramsCommandeDocument = [
+        'id' => $champs['IdCommandeDocument'],  
+        'nbExemplaire' => $champs['NbExemplaire'],
+        'idLivreDvd' => $champs['IdLivreDvd']
+    ];
+    if ($champs['IdCommandeDocument'] === $champs['IdCommande']) {
+        $paramsCommandeDocument['id'] = $champs['IdCommandeDocument'];  
+    } else {
+    return false;
+    }
+    $resultCommandeDocument = $this->conn->updateBDD($requeteCommandeDocument, $paramsCommandeDocument);
+    
+
+    $requeteSuivi = "INSERT INTO suivi (idCommandeDocument, etape) VALUES (:idCommandeDocument, :etape)";
+    $paramsSuivi = [
+        'idCommandeDocument' => $champs['IdCommandeDocument'], 
+        'etape' => 'En cours'
+    ];
+    $resultSuivi = $this->conn->updateBDD($requeteSuivi, $paramsSuivi);
+    
+
+    return ($resultCommande === 1 && $resultCommandeDocument === 1 && $resultSuivi === 1);
+}
     
 }
+    
+    
+
