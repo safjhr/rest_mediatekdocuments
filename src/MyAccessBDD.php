@@ -34,6 +34,8 @@ class MyAccessBDD extends AccessBDD {
         switch($table){  
             case "detailcommande" :
                 return $this->selectDetailCommande($champs);
+            case "detailabonnement" :
+                return $this->selectDetailAbonnement($champs);
             case "commandedocument" :
                 return $this->selectAllCommandedocuments();
             case "suivi":
@@ -48,6 +50,10 @@ class MyAccessBDD extends AccessBDD {
                 return $this->selectAllRevues();
             case "exemplaire" :
                 return $this->selectExemplairesRevue($champs);
+            case "utilisateur" :
+                return $this->selectAllUtilisateurs($champs);
+            case "service" :
+                return $this->selectServiceDeUtilisateur($champs);
             case "genre" :
             case "public" :
             case "rayon" :
@@ -58,6 +64,12 @@ class MyAccessBDD extends AccessBDD {
                 return $this->selectExemplairesRevue($champs['id']);
             case "detailcommande" :
                 return $this->selectDetailCommande($champs['idLivreDvd']);
+            case "detailabonnement" :
+                return $this->selectDetailAbonnement($champs['idRevue']);
+             case "utilisateur" :
+                return $this->selectAllUtilisateurs($champs['Pseudo'], $champs['Password']);
+             case "service" :
+                return $this->selectServiceDeUtilisateur($champs['Pseudo']);
             case "" :
                 // return $this->uneFonction(parametres);
             default:
@@ -77,6 +89,8 @@ class MyAccessBDD extends AccessBDD {
         switch($table){ 
             case "detailcommande":
                 return $this->insertDetailCommande($champs);
+            case "detailabonnement":
+                return $this->insertDetailAbonnement($champs);
             case "" :
                 // return $this->uneFonction(parametres);
             default:                    
@@ -95,6 +109,8 @@ class MyAccessBDD extends AccessBDD {
      */	
     protected function traitementUpdate(string $table, ?string $id, ?array $champs) : ?int{
         switch($table){
+            case "detailcommande":
+                return $this->updateDetailsCommande($champs);
             case "" :
                 // return $this->uneFonction(parametres);
             default:                    
@@ -112,6 +128,10 @@ class MyAccessBDD extends AccessBDD {
      */	
     protected function traitementDelete(string $table, ?array $champs) : ?int{
         switch($table){
+            case "detailcommande":
+                return $this->deleteDetailsCommande($champs);
+            case "detailabonnement":
+                return $this->deleteDetailAbonnement($champs);
             case "" :
                 // return $this->uneFonction(parametres);
             default:                    
@@ -339,9 +359,9 @@ class MyAccessBDD extends AccessBDD {
         return $this->conn->queryBDD($requete, $champsNecessaire);
     }
     
-    public function insertDetailCommande(?bool $champs): ?bool {
+    public function insertDetailCommande(?array $champs): ?int {
     
-    $champs = json_decode(file_get_contents("php://input"), true);
+
     if ($champs === null || 
         !isset($champs['IdCommande']) || 
         !isset($champs['IdCommandeDocument']) || 
@@ -350,11 +370,11 @@ class MyAccessBDD extends AccessBDD {
         !isset($champs['NbExemplaire']) || 
         !isset($champs['IdLivreDvd']) || 
         !isset($champs['Etape'])) {
-
-       
-        return false;
+        var_dump($champs);
+        return 0;
     }
 
+    // Requêtes d'insertion dans les tables
     $requeteCommande = "INSERT INTO commande (id, dateCommande, montant) VALUES (:id, :dateCommande, :montant)";
     $paramsCommande = [
         'id' => $champs['IdCommande'],  
@@ -362,22 +382,14 @@ class MyAccessBDD extends AccessBDD {
         'montant' => $champs['Montant']
     ];
     $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
-   
 
-    
     $requeteCommandeDocument = "INSERT INTO commandedocument (id, nbExemplaire, idLivreDvd) VALUES (:id, :nbExemplaire, :idLivreDvd)";
     $paramsCommandeDocument = [
         'id' => $champs['IdCommandeDocument'],  
         'nbExemplaire' => $champs['NbExemplaire'],
         'idLivreDvd' => $champs['IdLivreDvd']
     ];
-    if ($champs['IdCommandeDocument'] === $champs['IdCommande']) {
-        $paramsCommandeDocument['id'] = $champs['IdCommandeDocument'];  
-    } else {
-    return false;
-    }
     $resultCommandeDocument = $this->conn->updateBDD($requeteCommandeDocument, $paramsCommandeDocument);
-    
 
     $requeteSuivi = "INSERT INTO suivi (idCommandeDocument, etape) VALUES (:idCommandeDocument, :etape)";
     $paramsSuivi = [
@@ -385,9 +397,224 @@ class MyAccessBDD extends AccessBDD {
         'etape' => 'En cours'
     ];
     $resultSuivi = $this->conn->updateBDD($requeteSuivi, $paramsSuivi);
+
+    return $resultCommande + $resultCommandeDocument + $resultSuivi;
+}
+
+    private function updateDetailsCommande(?array $champs) : ?int {
+    if ($champs === null || !isset($champs['IdCommande'])) {
+        return 0; 
+    }
+
+    $totalLignesImpactees = 0;
+    if (isset($champs['DateCommande']) || isset($champs['Montant'])) {
+        $requeteCommande = "UPDATE commande SET ";
+        $paramsCommande = ['id' => $champs['IdCommande']];
+
+        if (isset($champs['DateCommande'])) {
+            $requeteCommande .= "dateCommande = :dateCommande";
+            $paramsCommande['dateCommande'] = $champs['DateCommande'];
+        }
+
+        if (isset($champs['Montant'])) {
+            $requeteCommande .= (isset($champs['DateCommande']) ? ", " : "") . "montant = :montant";
+            $paramsCommande['montant'] = $champs['Montant'];
+        }
+
+        $requeteCommande .= " WHERE id = :id";
+        $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
+        $totalLignesImpactees += $resultCommande ?? 0;
+    }
+
+    if (isset($champs['NbExemplaire']) || isset($champs['IdLivreDvd'])) {
+        $requeteCommandeDocument = "UPDATE commandedocument SET ";
+        $paramsCommandeDocument = ['id' => $champs['IdCommandeDocument']];
+
+        if (isset($champs['NbExemplaire'])) {
+            $requeteCommandeDocument .= "nbExemplaire = :nbExemplaire";
+            $paramsCommandeDocument['nbExemplaire'] = $champs['NbExemplaire'];
+        }
+
+        if (isset($champs['IdLivreDvd'])) {
+            $requeteCommandeDocument .= (isset($champs['NbExemplaire']) ? ", " : "") . "idLivreDvd = :idLivreDvd";
+            $paramsCommandeDocument['idLivreDvd'] = $champs['IdLivreDvd'];
+        }
+
+        $requeteCommandeDocument .= " WHERE id = :id";
+        $resultCommandeDocument = $this->conn->updateBDD($requeteCommandeDocument, $paramsCommandeDocument);
+        $totalLignesImpactees += $resultCommandeDocument ?? 0;
+    }
+
+    if (isset($champs['Etape'])) {
+        $requeteSuivi = "UPDATE suivi SET etape = :etape WHERE idCommandeDocument = :idCommandeDocument";
+        $paramsSuivi = [
+            'etape' => $champs['Etape'],
+            'idCommandeDocument' => $champs['IdCommandeDocument']
+        ];
+        $resultSuivi = $this->conn->updateBDD($requeteSuivi, $paramsSuivi);
+        $totalLignesImpactees += $resultSuivi ?? 0;
+    }
+
+    return $totalLignesImpactees > 0 ? $totalLignesImpactees : 0;
+    }
+
+  
+    private function deleteDetailsCommande(?array $champs) : ?int {
+     
+        if ($champs === null || 
+        !isset($champs['IdCommande'])) {
+        return 0; 
+    }
+        
+         
+        $requeteSuivi = "DELETE FROM suivi WHERE idCommandeDocument = :idCommandeDocument";
+        $paramsSuivi = [
+           'idCommandeDocument' => $champs['IdCommande']
+        ];
+        $resultSuivi = $this->conn->updateBDD($requeteSuivi, $paramsSuivi);
+        
+         $requeteCommandeDocument = "DELETE FROM commandedocument WHERE id = :id";
+        $paramsCommandeDocument = [
+           'id' => $champs['IdCommande']
+        ];
+        $resultCommandeDocument = $this->conn->updateBDD($requeteCommandeDocument, $paramsCommandeDocument);
+        
+        $requeteCommande = "DELETE FROM commande WHERE id = :id";
+        $paramsCommande = [
+           'id' => $champs['IdCommande']
+        ];
+        $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
+            
+        return $resultSuivi + $resultCommandeDocument + $resultCommande;
+    
+    } 
+    
+    private function selectDetailAbonnement (?array $champs) : ?array{  
+         if(empty($champs)){
+            return null;
+        }
+        if(!array_key_exists('idRevue', $champs)){
+            return null;
+        }
+
+        $champsNecessaire['idRevue'] = $champs['idRevue'];
+        $requete = "SELECT c.id AS idCommande, c.dateCommande AS dateCommande, c.montant as montant, a.idRevue as idRevue, a.dateFinAbonnement as dateFinAbonnement, a.id as idAbonnement ";
+        $requete .= "from abonnement a ";
+        $requete .= "join commande c on c.id = a.id ";
+        $requete .= "where a.idRevue = :idRevue ";
+        $requete .= "order by c.dateCommande desc ";
+        
+        
+        return $this->conn->queryBDD($requete, $champsNecessaire);
+    }
+
+    public function insertDetailAbonnement(?array $champs): ?int {
     
 
-    return ($resultCommande === 1 && $resultCommandeDocument === 1 && $resultSuivi === 1);
+    if ($champs === null || 
+        !isset($champs['IdCommande']) || 
+        !isset($champs['IdRevue']) ||
+        !isset($champs['IdAbonnement']) ||
+        !isset($champs['DateCommande']) || 
+        !isset($champs['Montant']) || 
+        !isset($champs['DateFinAbonnement'])) {
+        
+        return 0;
+    }
+    if ($champs['IdCommande'] !== $champs['IdAbonnement']) {
+        return null;
+    }
+
+    $requeteCommande = "INSERT INTO commande (id, dateCommande, montant) VALUES (:id, :dateCommande, :montant) ";
+    $paramsCommande = [
+        'id' => $champs['IdCommande'],
+        'dateCommande' => $champs['DateCommande'],
+        'montant' => $champs['Montant']
+    ];
+    $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
+
+    $requeteAbonnement = "INSERT INTO abonnement (id, dateFinAbonnement, idRevue) VALUES (:id, :dateFinAbonnement, :idRevue) ";
+    $paramsAbonnement = [
+        'id' => $champs['IdAbonnement'],  
+        'dateFinAbonnement' => $champs['DateFinAbonnement'],
+        'idRevue' => $champs['IdRevue']
+    ];
+    $resultAbonnement = $this->conn->updateBDD($requeteAbonnement, $paramsAbonnement);
+
+
+    return $resultCommande + $resultAbonnement ;
+    }
+    
+    private function ParutionDansAbonnement(string $dateCommande, string $dateFinAbonnement, string $dateParution): bool {
+    $dateCommandeObj = new DateTime($dateCommande);
+    $dateFinAbonnementObj = new DateTime($dateFinAbonnement);
+    $dateParutionObj = new DateTime($dateParution);
+
+    return $dateParutionObj >= $dateCommandeObj && $dateParutionObj <= $dateFinAbonnementObj;
+    }
+
+
+    private function deleteDetailAbonnement(?array $champs) : ?int {
+     
+        if ($champs === null || 
+        !isset($champs['IdCommande'])) {
+        return 0; 
+    }
+        
+         
+        $requeteAbonnement = "DELETE FROM abonnement WHERE id = :id";
+        $paramsAbonnement = [
+           'id' => $champs['IdAbonnement']
+        ];
+        $resultAbonnement = $this->conn->updateBDD($requeteAbonnement, $paramsAbonnement);
+        
+         $requeteCommande = "DELETE FROM commande WHERE id = :id";
+        $paramsCommande = [
+           'id' => $champs['IdCommande']
+        ];
+        $resultCommande = $this->conn->updateBDD($requeteCommande, $paramsCommande);
+        
+            
+        return $resultAbonnement + $resultCommande ;
+    } 
+    
+    private function selectAllUtilisateurs(?array $champs) : ?array
+    {
+       if (empty($champs) || !isset($champs['Pseudo']) || !isset($champs['Password'])){
+        return null; 
+
+       }
+
+        $requete = "SELECT u.pseudo, u.password ";
+        $requete .= "FROM utilisateur u ";
+        $requete .= "WHERE u.pseudo = :pseudo AND u.password = :password ";
+
+        $params = [
+            'pseudo' => $champs['Pseudo'],
+            'password' => $champs['Password']
+        ];
+      
+
+        return $this->conn->queryBDD($requete, $params);
+    }
+    
+    private function selectServiceDeUtilisateur(?array $champs): ?array {
+    // Harmonisation de la clé
+    if (empty($champs) || !isset($champs['pseudo'])) { // Vérifiez 'pseudo' (en minuscules)
+        return null; 
+    }
+
+    // Construction de la requête
+    $requete = "SELECT u.pseudo, u.password, se.idService, se.nomService, se.droitsAcces ";
+    $requete .= "FROM utilisateur u ";
+    $requete .= "JOIN service AS se ON se.idService = u.idService ";
+    $requete .= "WHERE u.pseudo = :pseudo";
+
+    $params = [
+        'pseudo' => $champs['pseudo'], // Utilisation cohérente de 'pseudo'
+    ];
+    
+    return $this->conn->queryBDD($requete, $params);
 }
     
 }
