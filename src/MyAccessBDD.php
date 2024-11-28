@@ -322,6 +322,10 @@ class MyAccessBDD extends AccessBDD {
     return $this->conn->queryBDD($requete);
     }
     
+    /**
+     * Récupérer toutes les commandedocument
+     * @return array|null
+     */
     private function selectAllCommandedocuments() : ?array {
         $requete = "select cd.id, cd.nbExemplaire, cd.idLivreDvd ";
         $requete .= "from commandedocument as cd ";
@@ -331,16 +335,24 @@ class MyAccessBDD extends AccessBDD {
         var_dump($requete);
         return $this->conn->queryBDD($requete);
     }
-    
-   private function selectAllSuivi() : ?array {
-    $requete = "SELECT s.id, s.idCommandeDocument, s.etape ";
-    $requete .= "FROM suivi as s ";
-    $requete .= "join commandedocument as cd on s.idCommandeDocument = cd.id ";
-    $requete .= "ORDER BY s.id DESC ";
-    return $this->conn->queryBDD($requete);
+   
+    /**
+     * Récupérer tout les suivi
+     * @return array|null
+     */
+    private function selectAllSuivi() : ?array {
+       $requete = "SELECT s.id, s.idCommandeDocument, s.etape ";
+       $requete .= "FROM suivi as s ";
+       $requete .= "join commandedocument as cd on s.idCommandeDocument = cd.id ";
+       $requete .= "ORDER BY s.id DESC ";
+       return $this->conn->queryBDD($requete);
     }
 
-    
+    /**
+     * Récupérer tout les details d'une commande
+     * @param array|null $champs
+     * @return array|null
+     */
     private function selectDetailCommande (?array $champs) : ?array{  
         if(empty($champs)){
             return null;
@@ -359,6 +371,11 @@ class MyAccessBDD extends AccessBDD {
         return $this->conn->queryBDD($requete, $champsNecessaire);
     }
     
+    /**
+     * 
+     * @param array|null $champs
+     * @return int|nullInserer les details d'une commande
+     */
     public function insertDetailCommande(?array $champs): ?int {
     
 
@@ -374,7 +391,6 @@ class MyAccessBDD extends AccessBDD {
         return 0;
     }
 
-    // Requêtes d'insertion dans les tables
     $requeteCommande = "INSERT INTO commande (id, dateCommande, montant) VALUES (:id, :dateCommande, :montant)";
     $paramsCommande = [
         'id' => $champs['IdCommande'],  
@@ -399,8 +415,13 @@ class MyAccessBDD extends AccessBDD {
     $resultSuivi = $this->conn->updateBDD($requeteSuivi, $paramsSuivi);
 
     return $resultCommande + $resultCommandeDocument + $resultSuivi;
-}
+    }
 
+    /**
+     * Modifier les details d'une commande
+     * @param array|null $champs
+     * @return int|null
+     */
     private function updateDetailsCommande(?array $champs) : ?int {
     if ($champs === null || !isset($champs['IdCommande'])) {
         return 0; 
@@ -458,7 +479,11 @@ class MyAccessBDD extends AccessBDD {
     return $totalLignesImpactees > 0 ? $totalLignesImpactees : 0;
     }
 
-  
+  /**
+   * Supprimer les details d'une commande
+   * @param array|null $champs
+   * @return int|null
+   */
     private function deleteDetailsCommande(?array $champs) : ?int {
      
         if ($champs === null || 
@@ -489,6 +514,11 @@ class MyAccessBDD extends AccessBDD {
     
     } 
     
+    /**
+     * Récupérer les details d'un abonnement
+     * @param array|null $champs
+     * @return array|null
+     */
     private function selectDetailAbonnement (?array $champs) : ?array{  
          if(empty($champs)){
             return null;
@@ -508,6 +538,11 @@ class MyAccessBDD extends AccessBDD {
         return $this->conn->queryBDD($requete, $champsNecessaire);
     }
 
+    /**
+     * Créer un details dun abonnement
+     * @param array|null $champs
+     * @return int|null
+     */
     public function insertDetailAbonnement(?array $champs): ?int {
     
 
@@ -544,7 +579,13 @@ class MyAccessBDD extends AccessBDD {
 
     return $resultCommande + $resultAbonnement ;
     }
-    
+    /**
+     * 
+     * @param string $dateCommande
+     * @param string $dateFinAbonnement
+     * @param string $dateParution
+     * @return bool
+     */
     private function ParutionDansAbonnement(string $dateCommande, string $dateFinAbonnement, string $dateParution): bool {
     $dateCommandeObj = new DateTime($dateCommande);
     $dateFinAbonnementObj = new DateTime($dateFinAbonnement);
@@ -554,6 +595,11 @@ class MyAccessBDD extends AccessBDD {
     }
 
 
+    /**
+     * Supprimer le detail d'un abonnement
+     * @param array|null $champs
+     * @return int|null
+     */
     private function deleteDetailAbonnement(?array $champs) : ?int {
      
         if ($champs === null || 
@@ -578,6 +624,11 @@ class MyAccessBDD extends AccessBDD {
         return $resultAbonnement + $resultCommande ;
     } 
     
+    /**
+     * récupérer tout les utilisateur
+     * @param array|null $champs
+     * @return array|null
+     */
     private function selectAllUtilisateurs(?array $champs) : ?array
     {
        if (empty($champs) || !isset($champs['Pseudo']) || !isset($champs['Password'])){
@@ -598,6 +649,11 @@ class MyAccessBDD extends AccessBDD {
         return $this->conn->queryBDD($requete, $params);
     }
     
+    /**
+     * Récuprer toutnles service d'un utilisateur
+     * @param array|null $champs
+     * @return array|null
+     */
     private function selectServiceDeUtilisateur(?array $champs): ?array {
     // Harmonisation de la clé
     if (empty($champs) || !isset($champs['pseudo'])) { // Vérifiez 'pseudo' (en minuscules)
