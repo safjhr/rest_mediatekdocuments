@@ -655,23 +655,26 @@ class MyAccessBDD extends AccessBDD {
      * @return array|null
      */
     private function selectServiceDeUtilisateur(?array $champs): ?array {
-    // Harmonisation de la clé
-    if (empty($champs) || !isset($champs['pseudo'])) { // Vérifiez 'pseudo' (en minuscules)
+    
+    if (empty($champs) || !isset($champs['Pseudo']) || !isset($champs['Password'])) { 
         return null; 
     }
+    
 
-    // Construction de la requête
     $requete = "SELECT u.pseudo, u.password, se.idService, se.nomService, se.droitsAcces ";
     $requete .= "FROM utilisateur u ";
     $requete .= "JOIN service AS se ON se.idService = u.idService ";
-    $requete .= "WHERE u.pseudo = :pseudo";
+    $requete .= "WHERE u.pseudo = :pseudo AND u.password = :password ";
 
     $params = [
-        'pseudo' => $champs['pseudo'], // Utilisation cohérente de 'pseudo'
+        'pseudo' => $champs['Pseudo'],
+        'password' => $champs['Password']
     ];
     
+    
+    
     return $this->conn->queryBDD($requete, $params);
-}
+    }
     
 }
     
